@@ -78,7 +78,11 @@ def test_messages(client):
 
 def test_delete_message(client):
     """Ensure the messages are being deleted"""
-    rv = client.get('/delete/1')
+    rv = client.get("/delete/1")
+    data = json.loads(rv.data)
+    assert data["status"] == 0
+    login(client, app.config["USERNAME"], app.config["PASSWORD"])
+    rv = client.get("/delete/1")
     data = json.loads(rv.data)
     assert data["status"] == 1
 
@@ -106,3 +110,31 @@ def test_search(client):
     assert rv.status_code == 200
     assert b"Flask tips" not in rv.data
     assert b"Cooking" not in rv.data
+
+
+def test_login_required(client):
+    """Ensure login_required blocks logged-out users and lets logged-in users through"""
+    login(client, app.config["USERNAME"], app.config["PASSWORD"])
+    client.post("/add", data=dict(title="Keep me", text="Still here"))
+    logout(client)
+
+    # logged out: rejected with a 401, and the view never runs
+    rv = client.get("/delete/1")
+    assert rv.status_code == 401
+    assert json.loads(rv.data) == {"status": 0, "message": "Please log in."}
+
+    # the post survived, and the flash message shows on the next page
+    rv = client.get("/")
+    assert b"Keep me" in rv.data
+    assert b"Please log in." in rv.data
+
+    # logged in: the view runs and the post is deleted
+    login(client, app.config["USERNAME"], app.config["PASSWORD"])
+    rv = client.get("/delete/1")
+    assert rv.status_code == 200
+    assert json.loads(rv.data)["status"] == 1
+    rv = client.get("/")
+    assert b"Keep me" not in rv.data
+
+    # @wraps keeps the view's name, which Flask uses as its endpoint
+    assert "delete_entry" in app.view_functions
