@@ -81,3 +81,28 @@ def test_delete_message(client):
     rv = client.get('/delete/1')
     data = json.loads(rv.data)
     assert data["status"] == 1
+
+
+def test_search(client):
+    """Ensure search shows posts matching the query and hides the rest"""
+    login(client, app.config["USERNAME"], app.config["PASSWORD"])
+    client.post("/add", data=dict(title="Flask tips", text="Routing basics"))
+    client.post("/add", data=dict(title="Cooking", text="Pasta recipes"))
+
+    # matches on title
+    rv = client.get("/search/", query_string=dict(query="Flask"))
+    assert rv.status_code == 200
+    assert b"Flask tips" in rv.data
+    assert b"Cooking" not in rv.data
+
+    # matches on text
+    rv = client.get("/search/", query_string=dict(query="Pasta"))
+    assert rv.status_code == 200
+    assert b"Cooking" in rv.data
+    assert b"Flask tips" not in rv.data
+
+    # no query renders the page without any posts
+    rv = client.get("/search/")
+    assert rv.status_code == 200
+    assert b"Flask tips" not in rv.data
+    assert b"Cooking" not in rv.data
