@@ -1,0 +1,3 @@
+[flake8]
+# Third-party code in the uv virtualenv; --exclude env does not match this name.
+extend-exclude = .venv
